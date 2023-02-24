@@ -4,9 +4,11 @@ from pygame import gfxdraw
 import pygame,sys
 import GUI_text_box
 import csv
+import os
 
 pygame.init()
 
+cwd = os.getcwd()
 # Configurtion set up
 class Config():
     def __init__(self):
@@ -148,7 +150,7 @@ class Canvas():
                 pygame.gfxdraw.pixel(screen, int(x[0]+1), int(x[1]-1), cfg.red)
                 pygame.gfxdraw.pixel(screen, int(x[0]-1), int(x[1]-1), cfg.red)
             # open the file in the write mode
-            with open('C:/Users/mstan/project/Potter Project/curve_points_file.csv', 'w', encoding='UTF8') as f:
+            with open(cwd + '/curve_points_file.csv', 'w', encoding='UTF8') as f:
                 # create the csv writer
                 writer = csv.writer(f)
                 writer.writerow(['x_pos', 'y_pos'])
@@ -183,7 +185,7 @@ class Canvas():
                 self.move_point=True
                 can_add=False
             if check == 2:
-                with open('C:/Users/mstan/project/Potter Project/ctrl_points_file.csv', newline='') as f:
+                with open(cwd + '/ctrl_points_file.csv', newline='') as f:
                     reader = csv.reader(f)
                     for row in reader:
                         if row != [] and row != ['x_pos', 'y_pos']:
@@ -194,7 +196,7 @@ class Canvas():
             if check == 4: 
                 pts = self.ctrl_points
                 # open the file in the write mode
-                with open('C:/Users/mstan/project/Potter Project/ctrl_points_file.csv', 'w', encoding='UTF8') as f:
+                with open(cwd + '/ctrl_points_file.csv', 'w', encoding='UTF8') as f:
                     # create the csv writer
                     writer = csv.writer(f)
                     writer.writerow(['x_pos', 'y_pos'])

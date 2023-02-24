@@ -1,38 +1,60 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import scipy.sparse.linalg as la
+import scipy.sparse as sp
 
-def laplace_solver(nodes, elements, bc, bc_value):
-    num_nodes = nodes.shape[0]
-    num_elements = elements.shape[0]
-    # Create the stiffness matrix
-    K = np.zeros((num_nodes, num_nodes))
-    # Create the load vector
-    f = np.zeros(num_nodes)
-    for element in elements:
-        x1, y1 = nodes[element[0]]
-        x2, y2 = nodes[element[1]]
-        x3, y3 = nodes[element[2]]
-        
-        # Compute the area of the triangle
-        area = 0.5 * abs(x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
-        
-        # Compute the local stiffness matrix
-        k = np.array([[(y2-y3)**2, + (x3 - x2)**2, (y3-y1)(y2-y3)+(x1-x3)(x3-x2), (y2-y3)(y1-y2)+(x3-x2)(x2-x1)],
-                      [(y3-y1)(y2-y3)+(x1-x3)(x3-x2),(y3-y1)**2+(x1-x3)**2, (y2-y3)(y1-y2)+(x3-x2)(x2-x1)],
-                      [(y2-y3)(y1-y2)+(x3-x2)(x2-x1),(y2-y3)(y1-y2)+(x3-x2)(x2-x1),(y1-y2)**2 + (x2-x1)**2]]) / (2 * area)
-        
-        # Assemble the global stiffness matrix
-        K[element[0], element[0]] += k[0, 0]
-        K[element[0], element[1]] += k[0, 1]
-        K[element[0], element[2]] += k[0, 2]
-        K[element[1], element[0]] += k[1, 0]
-        K[element[1], element[1]] += k[1, 1]
-        K[element[1], element[2]] += k[1, 2]
-        K[element[2], element[0]] += k[2, 0]
-        K[element[2], element[1]] += k[2, 1]
-        K[element[2], element[2]] += k[2, 2]
-        
-    # Apply the Dirichlect Boundary Condition
-    num_boundary_nodes = bc.shape[0]
-    for i in range(num_boundary_nodes):
-        index = bc[i]
-        value = bc_value[i]
+def laplace_solver(V, T, bndry_V, bndry_vals):
+    """
+    Solves the Laplace equation with a triangular mesh using the finite element method.
+
+    Parameters:
+        V (ndarray): An n x 2 array of node positions.
+        T (ndarray): An m x 3 array of triangle vertex indices.
+        bndry_V (ndarray): A p x 2 array of boundary node positions.
+        bndry_vals (ndarray): A p x 1 array of boundary values.
+
+    Returns:
+        An n x 1 array of nodal values.
+    """
+    # Calculate the area of each triangle
+    tri_areas = np.zeros(len(T))
+    for i in range(len(T)):
+        p1, p2, p3 = V[T[i]]
+        a = np.linalg.norm(p2 - p1)
+        b = np.linalg.norm(p3 - p2)
+        c = np.linalg.norm(p1 - p3)
+        s = (a + b + c) / 2
+        tri_areas[i] = np.sqrt(s * (s - a) * (s - b) * (s - c))
+
+    # Assemble the stiffness matrix
+    n = len(V)
+    K = sp.lil_matrix((n, n))
+    for i in range(n):
+        # Find all triangles that include vertex i
+        tris = [j for j in range(len(T)) if i in T[j]]
+        for j in tris:
+            # Calculate the contribution of triangle j to the local stiffness matrix
+            p1, p2, p3 = V[T[j]]
+            x1, y1 = p1
+            x2, y2 = p2
+            x3, y3 = p3
+            area = tri_areas[j]
+            b = np.array([[y2-y3, y3-y1, y1-y2], [x3-x2, x1-x3, x2-x1]]) / (2 * area)
+            local_K = area * np.dot(b.T, b)
+            # Add the contribution to the global stiffness matrix
+            for k in range(3):
+                for l in range(3):
+                    K[T[j, k], T[j, l]] += local_K[k, l]
+
+
+    # Apply boundary conditions to the stiffness matrix and right-hand side
+    for i in range(len(bndry_V)):
+        K[i, :] = 0
+        K[i, i] = 1
+    b = np.zeros(n)
+    for i in range(len(bndry_V)):
+        b[i] = bndry_vals[i]
+    # Solve the system of equations
+    u = la.spsolve(K.tocsr(), b)
+
+    return u

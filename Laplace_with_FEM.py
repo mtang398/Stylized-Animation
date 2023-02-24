@@ -12,20 +12,28 @@ from scipy import optimize
 from scipy.interpolate import splprep, splev
 
 import laplace_solver
+import Interpolation
+import os 
+import BIE
+
+cwd = os.getcwd()
 
 # Here solving Laplace's Equation with delta u = 0 and u = psi on the boundary
 # Load Curve_Points
 curve_pts = []
 crv_x = []
 crv_y = []
-with open('C:/Users/mstan/project/Potter Project/curve_points_file.csv', newline='') as f:
+bnd_node = []
+with open(cwd + '/curve_points_file.csv', newline='') as f:
     reader = csv.reader(f)
     for row in reader:
         if row != [] and row != ['x_pos', 'y_pos']:
             curve_pts.append((float(row[0]), float(row[1])))
             crv_x.append(float(row[0]))
             crv_y.append(float(row[1]))
-            
+            bnd_node.append([float(row[0]), float(row[1])])
+       
+bnd_node = np.array(bnd_node)     
 plt.scatter(crv_x,crv_y)
 ## Parametrization 
 ## Define the nodes as a 2D array
@@ -69,7 +77,20 @@ plt.show()
 def func(x,y):
     return x * np.sin(y)
 
+crv_x.pop(0)
+crv_y.pop(0)
 psi = func(crv_x, crv_y)
 curve_pts.pop(0)
 crvpts = np.array(curve_pts)
 solution = laplace_solver.laplace_solver(mesh_points,mesh_tris, crvpts, psi)
+
+x = []
+y = []
+for i in mesh_points:
+    x.append(i[0])
+    y.append(i[1])
+    
+Interpolation.interpolation(x,y,mesh_tris,solution)
+
+b = BIE.laplace_BIE(bnd_node,psi)
+print(b)
