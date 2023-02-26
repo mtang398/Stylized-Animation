@@ -1,47 +1,40 @@
 import numpy as np
-from scipy.integrate import quad
 import matplotlib.pyplot as plt
+import time
 
-def laplace_BIE(node_pos, boundary_condition, eps=1e-8, max_iter=1000):
-    """
-    Solve Laplace equation using boundary integral equation.
+def solve_laplace_equation(boundary_nodes, boundary_values):
+    t1 = time.time()
+    n = len(boundary_nodes)
 
-    Parameters:
-    -----------
-    node_pos : numpy.ndarray of shape (n, 2)
-        Array of node positions (x, y) in the boundary.
+    # Compute the distances between all pairs of boundary nodes
+    r = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            r[i, j] = np.sqrt((boundary_nodes[i][0] - boundary_nodes[j][0])**2 + (boundary_nodes[i][1] - boundary_nodes[j][1])**2)
 
-    boundary_condition : callable
-        Function that returns the boundary condition at a given position (x, y).
+    # Compute the matrix A
+    A = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            if i == j:
+                A[i, j] = np.pi
+            else:
+                A[i, j] = np.log(r[i, j])
 
-    eps : float, optional
-        Tolerance for stopping criterion. The algorithm stops when the maximum
-        difference between two consecutive solutions is less than `eps`.
-        
-    max_iter : int, optional
-        Maximum number of iterations.
+    # Compute the right-hand side vector b
+    b = boundary_values - np.mean(boundary_values)
 
-    Returns:
-    --------
-    u : numpy.ndarray of shape (n,)
-        Array of the solution at the boundary nodes.
-    """
-    n = len(node_pos)
-    u = np.zeros(n)
-    u_old = np.copy(u)
+    # Solve the linear system of equations Ax = b
+    x = np.linalg.solve(A, b)
+    t2 = time.time()
+    print('time for solving the linear system of equation')
+    print(t2 - t1)
+    # Define the solution function
+    def solution(x_coord, y_coord):
+        u = np.zeros_like(x_coord).astype('float64')
+        for i in range(n):
+            r = np.sqrt((x_coord - boundary_nodes[i][0])**2 + (y_coord - boundary_nodes[i][1])**2)
+            u += x[i] * np.log(r)
+        return u + np.mean(boundary_values)
 
-    for k in range(max_iter):
-        # Compute the boundary integral
-        integral = np.sum([(u[j] - u[i]) / np.linalg.norm(node_pos[i] - node_pos[j]) * boundary_condition(i) 
-                           for i in range(n) for j in range(n) if i != j])
-
-        # Compute the new solution
-        u = 1 / n * np.sum([boundary_condition(node_pos[i]) for i in range(n)]) + 1 / (2 * np.pi) * integral
-
-        # Check the stopping criterion
-        if np.max(np.abs(u - u_old)) < eps:
-            break
-        else:
-            u_old = np.copy(u)
-
-    return u
+    return solution
