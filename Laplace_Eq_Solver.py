@@ -19,6 +19,25 @@ import BIE
 
 import time
 
+def point_in_curve(points, poly):
+    x, y = points
+    n = len(poly)
+    inside = False
+
+    p1x, p1y = poly[0]
+    for i in range(n+1):
+        p2x, p2y = poly[i % n]
+        if y > min(p1y, p2y):
+            if y <= max(p1y, p2y):
+                if x <= max(p1x, p2x):
+                    if p1y != p2y:
+                        xints = (y - p1y) * (p2x - p1x) / (p2y - p1y) + p1x
+                    if p1x == p2x or x <= xints:
+                        inside = not inside
+        p1x, p1y = p2x, p2y
+
+    return inside
+
 cwd = os.getcwd()
 
 # Here solving Laplace's Equation with delta u = 0 and u = psi on the boundary
@@ -80,9 +99,9 @@ print(t3-t2)
 plt.triplot(mesh_points[:, 0], mesh_points[:, 1], mesh_tris)
 plt.show()
 
-# let's assume f(x,y) = x sin(y) on the boundary
-#def func(x,y):
-#    return x * np.sin(y)
+# let's assume f(x,y) = x^2 - y^2 on the boundary
+def func(x,y):
+    return x*x - y*y
 t0 = time.time()
 crv_x.pop(0)
 crv_y.pop(0)
@@ -91,9 +110,6 @@ psi = [x*x - y*y for x, y in zip(crv_x,crv_y)] # let's assume f(x,y) = x^2 - y^2
 curve_pts.pop(0)
 crvpts = np.array(curve_pts)
 solution = FEM.laplace_solver(mesh_points,mesh_tris, crvpts, psi)
-t1 = time.time()
-print('time spend in total with FEM')
-print(t1-t0)
 x = []
 y = []
 for i in mesh_points:
@@ -101,6 +117,9 @@ for i in mesh_points:
     y.append(i[1])
  
 Interpolation.interpolation(x,y,mesh_tris,solution)
+t1 = time.time()
+print('time spend in total with FEM')
+print(t1-t0)
 
 # Define the evaluation points
 x = np.linspace(int(min(crvpts[:,0])), int(max(crvpts[:,0])), int(max(crvpts[:,0])) - int(min(crvpts[:,0])))
@@ -126,30 +145,50 @@ graph_nodes = np.array(graph_nodes)
 plt.plot(graph_nodes[:, 0], graph_nodes[:, 1], 'k')
 plt.show()
 
-solution_BIE = BIE.solve_laplace_single_representation(crvpts, psi, BIE.green_func, points)
-plt.contourf(X, Y, solution_BIE.reshape(X.shape))
+solution_BIE = BIE.solve_laplace_single_representation(crvpts, psi, BIE.green_func)
+Z_BIE = solution_BIE(points)
+plt.contourf(X, Y, Z_BIE.reshape(X.shape))
 plt.colorbar()
 
 plt.plot(graph_nodes[:, 0], graph_nodes[:, 1], 'k')
 plt.show()
 
-solution_BIE2 = BIE.solve_laplace_double_representation(crvpts, psi, BIE.green_func, BIE.G_normal, points)
-plt.contourf(X, Y, solution_BIE.reshape(X.shape))
+TrueZ = func(X,Y)
+plt.contourf(X, Y, TrueZ.reshape(X.shape))
 plt.colorbar()
 
 plt.plot(graph_nodes[:, 0], graph_nodes[:, 1], 'k')
+plt.show()
+
+plt.imshow(abs(TrueZ.reshape(X.shape)- Z.reshape(X.shape)))
+plt.plot(graph_nodes[:, 0] - int(min(crvpts[:,0])), graph_nodes[:, 1] - int(min(crvpts[:,1])), 'k')
+plt.title("MFS Error Analysis")
+plt.colorbar()
+plt.show()
+
+plt.imshow(abs(TrueZ.reshape(X.shape)- Z_BIE.reshape(X.shape)))
+plt.plot(graph_nodes[:, 0] - int(min(crvpts[:,0])), graph_nodes[:, 1] - int(min(crvpts[:,1])), 'k')
+plt.title("BIE Error Analysis")
+plt.colorbar()
 plt.show()
 
 '''
-TrueZ = function(X,Y)
-plt.contourf(X, Y, Z.reshape(X.shape))
+solution_double_BIE = BIE.compute_double_layer(crvpts, psi, BIE.G_normal)
+Z_BIE_Double = solution_double_BIE(points)
+plt.contourf(X, Y, Z_BIE_Double.reshape(X.shape))
 plt.colorbar()
 
-graph_nodes = []
-for i in crvpts:
-    graph_nodes.append(i)
-graph_nodes.append(graph_nodes[0])
-graph_nodes = np.array(graph_nodes)
+plt.plot(graph_nodes[:, 0], graph_nodes[:, 1], 'k')
+plt.show()
+'''
+
+
+
+'''
+solution_BIE_double = BIE.solve_laplace_double_representation(crvpts, psi, BIE.green_func, BIE.G_normal, points)
+plt.contourf(X, Y, solution_BIE_double.reshape(X.shape))
+plt.colorbar()
+
 plt.plot(graph_nodes[:, 0], graph_nodes[:, 1], 'k')
 plt.show()
 '''

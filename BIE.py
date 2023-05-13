@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.integrate import quad
 from scipy.optimize import fsolve
-
+import scipy as sp
 import time
 
 def green_func(x, y, eps=1e-8):
@@ -11,26 +11,25 @@ def green_func(x, y, eps=1e-8):
     """
     r = np.linalg.norm(x - y)
     if r < eps:
-        return -np.log(eps) / (2*np.pi)
+        return 0
     else:
         return -np.log(r) / (2*np.pi)
 
 import numpy as np
 
 def G_normal(z, y):
-    # Compute the gradient of G(z,y) with respect to y
-    grad_G = np.array([y[1]-z[1], z[0]-y[0]]) / ((z[0]-y[0])**2 + (z[1]-y[1])**2)
     
-    # Compute the unit outward normal vector at point y
-    n = np.array([y[0]-z[0], y[1]-z[1]]) / np.sqrt((y[0]-z[0])**2 + (y[1]-z[1])**2)
+    dist = np.linalg.norm(z - y)
     
-    # Compute the dot product of grad_G and n to get the normal derivative of G(z,y)
-    G_normal = grad_G.dot(n)
+    # Compute the unit outward normal vector at the point y on the boundary
+    n = (z - y) / dist
     
-    return G_normal
+    # Compute the normal derivative of the Green's function at point y
+    gnormal = -1 / (2 * np.pi * dist) * n[1]
+    
+    return gnormal
 
-
-def solve_laplace_single_representation(nodes, f, G, points):
+def solve_laplace_single_representation(nodes, f, G):
     t1 = time.time()
     N = nodes.shape[0]
     A = np.zeros((N, N))
@@ -40,21 +39,46 @@ def solve_laplace_single_representation(nodes, f, G, points):
     for i in range(N):
         for j in range(N):
             if i == j:
-                A[i,j] = -0.5
+                A[i,j] = 0.005
             else:
                 A[i,j] = G(nodes[i], nodes[j])
 
     # Solve the linear system Ax = b
     phi = np.linalg.solve(A, b)
+    print(phi)
             
-    M = len(points)
-    u = np.zeros(M)
-    for i in range(M):
-        u[i] = np.sum(phi * np.array([G(points[i], y) for y in nodes]))
+    def u(points):
+        M = len(points)
+        u = np.zeros(M)
+        for i in range(M):
+            u[i] = np.sum(phi * np.array([G(points[i], y) for y in nodes]))
+        return u
     t2 = time.time()
     print('time spend in total with single representation BIE: ')
     print(t2 - t1)
     return u
+
+def compute_double_layer(nodes, f, G_normal):
+    # Compute the kernel matrix K
+    K = np.zeros((len(nodes), len(nodes)))
+    for i in range(len(nodes)):
+        for j in range(len(nodes)):
+            if i == j:
+                K[i, j] = 0
+            else:
+                K[i, j] = -G_normal(nodes[i], nodes[j])
+                
+    A = 0.5*np.identity(len(nodes)) + K
+    phi = np.linalg.solve(A, f)
+    
+    def U(points):
+        M = len(points)
+        u = np.zeros(M)
+        for i in range(M):
+            u[i] = - np.sum(phi * np.array([G_normal(points[i], y) for y in nodes]))
+        return u
+
+    return U
 
 def solve_laplace_double_representation(nodes, f, G, Gnormal, points):
     t1 = time.time()
@@ -66,8 +90,11 @@ def solve_laplace_double_representation(nodes, f, G, Gnormal, points):
     for i in range(N):
         z_i = nodes[i]
         for j in range(N):
-            z_j = nodes[j]
-            A[i, j] = 0.5 * G(z_i, z_j) - Gnormal(z_i, z_j) * G(z_j, z_i)
+            if i == j:
+                A[i,j] = 0
+            else:
+                z_j = nodes[j]
+                A[i, j] = 0.5 * G(z_i, z_j) - Gnormal(z_i, z_j) * G(z_j, z_i)
 
     # Solve the linear system A*phi = f to obtain the values of phi
     phi = np.linalg.solve(A, f)
